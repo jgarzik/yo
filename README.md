@@ -1,67 +1,222 @@
+# yo
 
-# yo: An open source meta agent
+An open source, local agentic butler for software development. `yo` orchestrates LLM interactions with file and shell tools, providing a secure policy engine for automated coding tasks.
 
-"yo" is a local agentic butler that helps you build, test, and maintain software projects using AI agents. It acts as a wrapper and policy engine for LLMs, providing a secure and controlled environment for automated coding tasks.
+## Features
 
-## Key Features
+- **Local execution** - Runs on your machine with access restricted to project files
+- **Multi-backend LLM support** - Venice (default), OpenAI, Anthropic, Ollama, or custom endpoints
+- **Built-in tools** - Read, Write, Edit, Grep, Glob, Bash
+- **MCP integration** - Connect external tool servers via Model Context Protocol
+- **Permission system** - Granular allow/ask/deny rules for tool access
+- **Skill routing** - Map named skills to specific model@backend targets
+- **Session transcripts** - JSONL audit logs of all interactions
+- **Context management** - Automatic compaction when conversation grows large
 
-- **Local Execution**: Runs entirely on your machine, with access only to your project files.
-- **Multi-backend Support**: Connects to various LLM providers including Venice, OpenAI, Anthropic, and local Ollama instances.
-- **Permission System**: Granular control over tool usage with allow/deny/ask rules for security.
-- **Interactive REPL**: Engage in conversations with the agent using `/help` for available commands.
-- **Tool Integration**: Built-in tools for common operations:
-  - `Read`: Read file contents
-  - `Write`: Create or overwrite files
-  - `Edit`: Modify files with find/replace operations
-  - `Grep`: Search file contents with regex patterns
-  - `Glob`: Find files using glob patterns
-  - `Bash`: Execute shell commands (with safety restrictions)
-- **Configuration Flexibility**: Customizable via config files at user, project, or local levels.
-- **Context Management**: Handles conversation history and context compaction automatically.
-- **Session Transcripts**: All interactions are logged for auditing and reproducibility.
+## Usage
 
-## Getting Started
+### Installation
 
-1. **Installation**: Build from source with `cargo build --release`
-2. **Configuration**: Set up API keys and preferences in `~/.yo/config.toml` or project-level `.yo/config.toml`
-3. **Usage Modes**:
-   - Interactive: Run `yo` for REPL mode
-   - One-shot: Use `yo -p "your prompt"` for single commands
-4. **Environment Variables**: Configure your AI provider keys:
-   - Venice: `VENICE_API_KEY`
-   - OpenAI: `OPENAI_API_KEY`
-   - Anthropic: `ANTHROPIC_API_KEY`
+```bash
+cargo build --release
+```
 
-## Security Model
+### Running
 
-`yo` implements a strict permission system to prevent unauthorized actions:
+```bash
+# Interactive REPL
+yo
 
-- By default, potentially dangerous operations (`Write`, `Edit`, `Bash`) require explicit approval
-- `curl` and `wget` commands are blocked by default for security
-- Path access is restricted to the project root directory
-- Configurable permission modes: `default`, `acceptEdits`, or `bypassPermissions`
-- Rule-based pattern matching for fine-grained control over tool behavior
+# One-shot prompt
+yo -p "your prompt here"
+
+# With auto-approve for file edits
+yo -p "refactor main.rs" --yes
+```
+
+### Environment Variables
+
+| Variable | Backend |
+|----------|---------|
+| `VENICE_API_KEY` | Venice (default) |
+| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+
+### CLI Options
+
+| Flag | Description |
+|------|-------------|
+| `-p, --prompt` | One-shot prompt mode |
+| `--target` | Override LLM target (format: `model@backend`) |
+| `--mode` | Permission mode: default, acceptEdits, bypassPermissions |
+| `--max-turns` | Max agent iterations per turn (default: 12) |
+| `--trace` | Enable detailed tracing |
+| `--list-targets` | Show configured backends and skills |
+
+## REPL Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/exit`, `/quit` | Exit REPL |
+| `/clear` | Clear conversation history |
+| `/session` | Show session ID and transcript path |
+| `/context` | Show context usage stats |
+| `/backends` | List configured backends |
+| `/skills` | List available skills |
+| `/skill [name]` | Get or set current skill |
+| `/target [model@backend]` | Override current target |
+| `/mode [name]` | Get or set permission mode |
+| `/permissions` | Show permission rules |
+| `/permissions add [allow\|ask\|deny] "pattern"` | Add rule |
+| `/trace` | Toggle tracing |
+| `/mcp list` | List MCP servers |
+| `/mcp connect <name>` | Connect to MCP server |
+| `/mcp disconnect <name>` | Disconnect MCP server |
+| `/mcp tools <name>` | List tools from MCP server |
 
 ## Configuration
 
-Configuration follows a hierarchy (highest to lowest priority):
-1. Command-line arguments
-2. `.yo/config.local.toml`
-3. `.yo/config.toml`
-4. `~/.yo/config.toml`
+Configuration hierarchy (highest to lowest priority):
+1. CLI arguments
+2. `.yo/config.local.toml` (git-ignored)
+3. `.yo/config.toml` (project)
+4. `~/.yo/config.toml` (user)
 5. Built-in defaults
 
-See `example-yo.toml` for a complete configuration reference.
+### Config Sections
 
-## Development
+```toml
+[backends.venice]
+base_url = "https://api.venice.ai/api/v1"
+api_key_env = "VENICE_API_KEY"
 
-The codebase is structured as a Rust application with the following components:
-- **Agent loop**: Core reasoning and tool orchestration
-- **CLI interface**: Interactive REPL and command-line options
-- **Tool system**: Modular tools for file and system operations
-- **Policy engine**: Permission checking and security controls
-- **Configuration management**: Flexible settings loading and merging
-- **Context handling**: Conversation state and history management
+[skills]
+default = "qwen3-235b-a22b-instruct-2507@venice"
+fast = "gpt-4o-mini@chatgpt"
 
-Refer to the project documentation for development guidelines.
+[permissions]
+mode = "default"
+allow = ["Bash(git diff:*)"]
+ask = ["Write"]
+deny = ["Bash(rm -rf:*)"]
 
+[bash]
+timeout_ms = 120000
+max_output_bytes = 200000
+
+[context]
+max_chars = 250000
+auto_compact_enabled = true
+
+[mcp.servers.calc]
+command = "/path/to/mcp-calc"
+args = []
+auto_start = false
+```
+
+See `example-yo.toml` for complete reference.
+
+## Security Model
+
+### Permission Modes
+
+| Mode | Behavior |
+|------|----------|
+| `default` | Read-only tools allowed; Write/Edit/Bash require approval |
+| `acceptEdits` | File mutations allowed; Bash requires approval |
+| `bypassPermissions` | All tools allowed (trusted environments only) |
+
+### Rule Patterns
+
+- `"Write"` - Match all Write calls
+- `"Bash(git:*)"` - Match Bash commands starting with "git"
+- `"Bash(npm install)"` - Match exact command
+- `"mcp.server.*"` - Match all tools from MCP server
+
+### Built-in Protections
+
+- `curl` and `wget` blocked by default
+- All paths validated to stay within project root
+- Symlinks resolved to prevent escape
+
+## Architecture
+
+```
+User Input
+    │
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  cli.rs                                             │
+│  REPL loop, slash commands, message history         │
+└─────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  agent.rs                                           │
+│  Core loop: LLM request → tool calls → results      │
+│  Iterates until LLM stops requesting tools (max 12) │
+└─────────────────────────────────────────────────────┘
+    │
+    ├──────────────────────────────────┐
+    ▼                                  ▼
+┌───────────────┐              ┌───────────────────┐
+│  backend.rs   │              │  policy.rs        │
+│  LLM registry │              │  Permission rules │
+│  Lazy loading │              │  allow/ask/deny   │
+└───────────────┘              └───────────────────┘
+    │
+    ▼
+┌───────────────┐
+│  llm.rs       │
+│  HTTP client  │
+│  OpenAI API   │
+└───────────────┘
+```
+
+### Modules
+
+| File | Responsibility |
+|------|----------------|
+| `main.rs` | Entry point, CLI parsing, config bootstrap |
+| `cli.rs` | REPL interface, slash command dispatch |
+| `agent.rs` | Agent loop, tool orchestration, LLM calls |
+| `config.rs` | Hierarchical config loading and merging |
+| `policy.rs` | Permission decision engine, rule matching |
+| `backend.rs` | Backend registry, lazy client initialization |
+| `llm.rs` | OpenAI-compatible HTTP client |
+| `transcript.rs` | JSONL session logging |
+| `context.rs` | Conversation history, compaction framework |
+| `tools/mod.rs` | Tool registry, path validation, dispatch |
+| `tools/read.rs` | Read file contents |
+| `tools/write.rs` | Create/overwrite files |
+| `tools/edit.rs` | Find-and-replace edits |
+| `tools/bash.rs` | Shell command execution with timeout |
+| `tools/grep.rs` | Regex content search |
+| `tools/glob.rs` | File pattern matching |
+| `tools/mcp_dispatch.rs` | Route MCP tool calls |
+| `mcp/client.rs` | MCP JSON-RPC client |
+| `mcp/manager.rs` | MCP server lifecycle |
+| `mcp/transport.rs` | Stdio transport layer |
+
+### Data Flow
+
+1. User input received (REPL or one-shot)
+2. Agent adds message to conversation
+3. Agent resolves skill → target (model@backend)
+4. Agent collects tool schemas (built-in + MCP)
+5. LLM request sent with messages + tools
+6. Response parsed for text and tool calls
+7. Each tool call: policy check → execute → log
+8. Results added to conversation
+9. Loop continues until LLM stops calling tools
+10. Final response displayed to user
+
+### Transcripts
+
+Sessions logged to `.yo/sessions/<uuid>.jsonl` with events:
+- User/assistant messages
+- Tool calls and results
+- Permission decisions
+- MCP server lifecycle
+- Errors and metadata
