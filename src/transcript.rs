@@ -74,14 +74,6 @@ impl Transcript {
         )
     }
 
-    #[allow(dead_code)]
-    pub fn permission(&mut self, tool: &str, allowed: bool) -> Result<()> {
-        self.log(
-            "permission",
-            serde_json::json!({ "tool": tool, "allowed": allowed }),
-        )
-    }
-
     /// Log a policy decision for a tool call
     pub fn policy_decision(
         &mut self,
@@ -97,53 +89,6 @@ impl Transcript {
                 "rule_matched": rule_matched,
             }),
         )
-    }
-
-    /// Log a context compaction event
-    #[allow(dead_code)]
-    pub fn compact_event(
-        &mut self,
-        chars_before: usize,
-        chars_after: usize,
-        messages_before: usize,
-        messages_after: usize,
-    ) -> Result<()> {
-        self.log(
-            "compact_event",
-            serde_json::json!({
-                "chars_before": chars_before,
-                "chars_after": chars_after,
-                "messages_before": messages_before,
-                "messages_after": messages_after,
-            }),
-        )
-    }
-
-    /// Log settings loaded at startup
-    #[allow(dead_code)]
-    pub fn settings_loaded(
-        &mut self,
-        config_files: &[String],
-        permission_mode: &str,
-        allow_rules: usize,
-        ask_rules: usize,
-        deny_rules: usize,
-    ) -> Result<()> {
-        self.log(
-            "settings_loaded",
-            serde_json::json!({
-                "config_files": config_files,
-                "permission_mode": permission_mode,
-                "allow_rules": allow_rules,
-                "ask_rules": ask_rules,
-                "deny_rules": deny_rules,
-            }),
-        )
-    }
-
-    #[allow(dead_code)]
-    pub fn error(&mut self, message: &str) -> Result<()> {
-        self.log("error", serde_json::json!({ "message": message }))
     }
 
     /// Log MCP server start
@@ -235,6 +180,52 @@ impl Transcript {
             serde_json::json!({
                 "name": name,
                 "exit_status": exit_status,
+            }),
+        )
+    }
+
+    /// Log subagent start
+    pub fn subagent_start(
+        &mut self,
+        name: &str,
+        effective_mode: &str,
+        allowed_tools: &[String],
+    ) -> Result<()> {
+        self.log(
+            "subagent_start",
+            serde_json::json!({
+                "name": name,
+                "effective_mode": effective_mode,
+                "allowed_tools": allowed_tools,
+            }),
+        )
+    }
+
+    /// Log subagent end
+    pub fn subagent_end(&mut self, name: &str, ok: bool, duration_ms: u64) -> Result<()> {
+        self.log(
+            "subagent_end",
+            serde_json::json!({
+                "name": name,
+                "ok": ok,
+                "duration_ms": duration_ms,
+            }),
+        )
+    }
+
+    /// Log subagent tool call
+    pub fn subagent_tool_call(
+        &mut self,
+        agent: &str,
+        tool: &str,
+        args: &serde_json::Value,
+    ) -> Result<()> {
+        self.log(
+            "subagent_tool_call",
+            serde_json::json!({
+                "agent": agent,
+                "tool": tool,
+                "args": args,
             }),
         )
     }

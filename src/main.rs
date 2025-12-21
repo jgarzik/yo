@@ -2,11 +2,10 @@ mod agent;
 mod backend;
 mod cli;
 mod config;
-mod context;
 mod llm;
 mod mcp;
-mod permissions;
 mod policy;
+mod subagent;
 mod tools;
 mod transcript;
 

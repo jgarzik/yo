@@ -97,17 +97,3 @@ pub fn execute(args: Value, root: &Path) -> anyhow::Result<Value> {
         "after_sha256": sha256(content.as_bytes())
     }))
 }
-
-#[allow(dead_code)]
-pub fn summarize(args: &Value) -> String {
-    let edits = args["edits"].as_array();
-    match edits {
-        Some(e) if !e.is_empty() => {
-            let first = &e[0];
-            let find = first["find"].as_str().unwrap_or("?");
-            let preview = if find.len() > 30 { &find[..30] } else { find };
-            format!("{} edit(s), first: replace \"{}\"...", e.len(), preview)
-        }
-        _ => "edit file".to_string(),
-    }
-}

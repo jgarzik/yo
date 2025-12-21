@@ -148,12 +148,6 @@ impl PolicyEngine {
         false
     }
 
-    /// Check if any rule in the list matches
-    #[allow(dead_code)]
-    fn matches_any(rules: &[String], tool: &str, arg: Option<&str>) -> bool {
-        rules.iter().any(|r| Self::rule_matches(r, tool, arg))
-    }
-
     /// Determine the permission decision for a tool call
     /// Returns (Decision, Option<matched_rule>)
     pub fn decide(&self, tool: &str, args: &Value) -> (Decision, Option<String>) {

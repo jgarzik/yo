@@ -4,6 +4,7 @@ mod glob;
 mod grep;
 pub mod mcp_dispatch;
 mod read;
+pub mod task;
 mod write;
 
 use crate::config::BashConfig;
@@ -11,6 +12,7 @@ use anyhow::Result;
 use serde_json::{json, Value};
 use std::path::Path;
 
+/// Get all built-in tool schemas (excluding Task - used by subagents)
 pub fn schemas() -> Vec<Value> {
     vec![
         read::schema(),
@@ -19,6 +21,19 @@ pub fn schemas() -> Vec<Value> {
         grep::schema(),
         glob::schema(),
         bash::schema(),
+    ]
+}
+
+/// Get all tool schemas including Task (used by main agent)
+pub fn schemas_with_task() -> Vec<Value> {
+    vec![
+        read::schema(),
+        write::schema(),
+        edit::schema(),
+        grep::schema(),
+        glob::schema(),
+        bash::schema(),
+        task::schema(),
     ]
 }
 
@@ -36,11 +51,6 @@ pub fn execute(name: &str, args: Value, root: &Path, bash_config: &BashConfig) -
             json!({ "error": { "code": "unknown_tool", "message": format!("Unknown tool: {}", name) } }),
         ),
     }
-}
-
-#[allow(dead_code)]
-pub fn requires_permission(name: &str) -> bool {
-    matches!(name, "Write" | "Edit" | "Bash")
 }
 
 fn validate_path(path: &str, root: &Path) -> Result<std::path::PathBuf, Value> {
