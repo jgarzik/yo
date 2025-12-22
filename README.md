@@ -4,6 +4,10 @@ An open source, local agentic butler for software development. `yo` orchestrates
 
 yo features **multi-vendor, multi-model routing**, sending coding tasks to the best coding model (anthropic opus, for example) and sending planning tasks to the best planning model (qwen, for example), taking a vendor neutral, "best model wins" approach.
 
+## Status
+
+Not production yet.  Currently undergoing heavy development and testing.  Contributions welcome (file an issue).
+
 ## Features
 
 - **Local execution** - Runs on your machine with access restricted to project files
