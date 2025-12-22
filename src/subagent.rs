@@ -1,5 +1,6 @@
 //! Subagent runtime for executing specialized, restricted agent tasks.
 
+use crate::agent::CommandStats;
 use crate::config::{AgentSpec, PermissionMode};
 use crate::policy::{Decision, PolicyEngine};
 use crate::{cli::Context, llm, tools};
@@ -133,13 +134,15 @@ fn trace(ctx: &Context, agent: &str, label: &str, content: &str) {
 }
 
 /// Run a subagent with the given specification and prompt
+/// Returns both the result and stats collected during execution
 pub fn run_subagent(
     ctx: &Context,
     spec: &AgentSpec,
     prompt: &str,
     input_context: Option<InputContext>,
-) -> Result<SubagentResult> {
+) -> Result<(SubagentResult, CommandStats)> {
     let start_time = Instant::now();
+    let mut stats = CommandStats::default();
     let agent_name = &spec.name;
 
     // Get parent permission mode
@@ -297,6 +300,12 @@ pub fn run_subagent(
             client.chat(&request)?
         };
 
+        // Track token usage from this LLM call
+        if let Some(usage) = &response.usage {
+            stats.input_tokens += usage.prompt_tokens;
+            stats.output_tokens += usage.completion_tokens;
+        }
+
         if response.choices.is_empty() {
             break;
         }
@@ -337,6 +346,9 @@ pub fn run_subagent(
         for tc in tool_calls {
             let name = &tc.function.name;
             let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(json!({}));
+
+            // Count this tool use
+            stats.tool_uses += 1;
 
             trace(
                 ctx,
@@ -487,14 +499,17 @@ pub fn run_subagent(
         &format!("duration={}ms", duration_ms),
     );
 
-    Ok(SubagentResult {
-        agent: agent_name.clone(),
-        ok: !had_errors,
-        output: SubagentOutput {
-            text: collected_text,
-            files_referenced,
-            proposed_edits,
+    Ok((
+        SubagentResult {
+            agent: agent_name.clone(),
+            ok: !had_errors,
+            output: SubagentOutput {
+                text: collected_text,
+                files_referenced,
+                proposed_edits,
+            },
+            error: last_error,
         },
-        error: last_error,
-    })
+        stats,
+    ))
 }

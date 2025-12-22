@@ -6,6 +6,28 @@ use serde_json::{json, Value};
 
 const MAX_ITERATIONS: usize = 12;
 
+/// Statistics collected during command execution
+#[derive(Debug, Default, Clone)]
+pub struct CommandStats {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub tool_uses: u64,
+}
+
+impl CommandStats {
+    /// Total tokens used (input + output)
+    pub fn total_tokens(&self) -> u64 {
+        self.input_tokens + self.output_tokens
+    }
+
+    /// Merge stats from another source (e.g., subagent)
+    pub fn merge(&mut self, other: &CommandStats) {
+        self.input_tokens += other.input_tokens;
+        self.output_tokens += other.output_tokens;
+        self.tool_uses += other.tool_uses;
+    }
+}
+
 const SYSTEM_PROMPT: &str = r#"You are an agentic coding assistant running locally.
 You can only access files via tools. All paths are relative to the project root.
 Use Glob/Grep to find files before Read. Before Edit/Write, explain what you will change.
@@ -25,7 +47,8 @@ fn verbose(ctx: &Context, message: &str) {
     }
 }
 
-pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> Result<()> {
+pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> Result<CommandStats> {
+    let mut stats = CommandStats::default();
     let _ = ctx.transcript.borrow_mut().user_message(user_input);
 
     messages.push(json!({
@@ -159,6 +182,12 @@ pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> R
             client.chat(&request)?
         };
 
+        // Track token usage from this LLM call
+        if let Some(usage) = &response.usage {
+            stats.input_tokens += usage.prompt_tokens;
+            stats.output_tokens += usage.completion_tokens;
+        }
+
         if response.choices.is_empty() {
             println!("No response from model");
             break;
@@ -203,6 +232,9 @@ pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> R
         for tc in tool_calls {
             let name = &tc.function.name;
             let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(json!({}));
+
+            // Count this tool use
+            stats.tool_uses += 1;
 
             trace(
                 ctx,
@@ -287,7 +319,9 @@ pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> R
                     }
                 } else if name == "Task" {
                     // Execute Task tool (subagent delegation)
-                    tools::task::execute(args.clone(), ctx)?
+                    let (result, sub_stats) = tools::task::execute(args.clone(), ctx)?;
+                    stats.merge(&sub_stats);
+                    result
                 } else if name.starts_with("mcp.") {
                     // Execute MCP tool
                     let start = std::time::Instant::now();
@@ -376,5 +410,5 @@ pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> R
         }
     }
 
-    Ok(())
+    Ok(stats)
 }

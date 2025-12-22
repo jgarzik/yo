@@ -1,5 +1,6 @@
 //! Task tool for delegating work to subagents.
 
+use crate::agent::CommandStats;
 use crate::cli::Context;
 use crate::subagent::{self, InputContext, SubagentResult};
 use serde_json::{json, Value};
@@ -50,28 +51,35 @@ pub fn schema() -> Value {
 }
 
 /// Execute the Task tool - delegates to a subagent
-pub fn execute(args: Value, ctx: &Context) -> anyhow::Result<Value> {
+/// Returns both the result JSON and collected stats
+pub fn execute(args: Value, ctx: &Context) -> anyhow::Result<(Value, CommandStats)> {
     let agent_name = match args["agent"].as_str() {
         Some(name) => name,
         None => {
-            return Ok(json!({
-                "error": {
-                    "code": "missing_agent",
-                    "message": "Missing required 'agent' parameter"
-                }
-            }));
+            return Ok((
+                json!({
+                    "error": {
+                        "code": "missing_agent",
+                        "message": "Missing required 'agent' parameter"
+                    }
+                }),
+                CommandStats::default(),
+            ));
         }
     };
 
     let prompt = match args["prompt"].as_str() {
         Some(p) => p,
         None => {
-            return Ok(json!({
-                "error": {
-                    "code": "missing_prompt",
-                    "message": "Missing required 'prompt' parameter"
-                }
-            }));
+            return Ok((
+                json!({
+                    "error": {
+                        "code": "missing_prompt",
+                        "message": "Missing required 'prompt' parameter"
+                    }
+                }),
+                CommandStats::default(),
+            ));
         }
     };
 
@@ -81,12 +89,15 @@ pub fn execute(args: Value, ctx: &Context) -> anyhow::Result<Value> {
         Some(s) => s.clone(),
         None => {
             let available: Vec<&String> = config.agents.keys().collect();
-            return Ok(json!({
-                "error": {
-                    "code": "agent_not_found",
-                    "message": format!("Agent '{}' not found. Available agents: {:?}", agent_name, available)
-                }
-            }));
+            return Ok((
+                json!({
+                    "error": {
+                        "code": "agent_not_found",
+                        "message": format!("Agent '{}' not found. Available agents: {:?}", agent_name, available)
+                    }
+                }),
+                CommandStats::default(),
+            ));
         }
     };
     drop(config);
@@ -98,13 +109,16 @@ pub fn execute(args: Value, ctx: &Context) -> anyhow::Result<Value> {
 
     // Run the subagent
     match subagent::run_subagent(ctx, &spec, prompt, input_context) {
-        Ok(result) => Ok(subagent_result_to_json(&result)),
-        Err(e) => Ok(json!({
-            "error": {
-                "code": "subagent_error",
-                "message": e.to_string()
-            }
-        })),
+        Ok((result, sub_stats)) => Ok((subagent_result_to_json(&result), sub_stats)),
+        Err(e) => Ok((
+            json!({
+                "error": {
+                    "code": "subagent_error",
+                    "message": e.to_string()
+                }
+            }),
+            CommandStats::default(),
+        )),
     }
 }
 

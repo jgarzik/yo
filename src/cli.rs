@@ -1,5 +1,5 @@
 use crate::{
-    agent,
+    agent::{self, CommandStats},
     backend::BackendRegistry,
     config::Config,
     config::PermissionMode,
@@ -16,6 +16,7 @@ use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 pub struct Context {
     pub args: Args,
@@ -33,9 +34,27 @@ pub struct Context {
     pub model_router: RefCell<ModelRouter>,
 }
 
+/// Print command stats to stderr
+fn print_stats(duration: Duration, stats: &CommandStats) {
+    let tokens = stats.total_tokens();
+    let token_display = if tokens >= 1000 {
+        format!("{:.1}k", tokens as f64 / 1000.0)
+    } else {
+        tokens.to_string()
+    };
+    eprintln!(
+        "[Duration: {:.1}s | Tokens: {} | Tools: {}]",
+        duration.as_secs_f64(),
+        token_display,
+        stats.tool_uses
+    );
+}
+
 pub fn run_once(ctx: &Context, prompt: &str) -> Result<()> {
+    let start = Instant::now();
     let mut messages = Vec::new();
-    agent::run_turn(ctx, prompt, &mut messages)?;
+    let stats = agent::run_turn(ctx, prompt, &mut messages)?;
+    print_stats(start.elapsed(), &stats);
     Ok(())
 }
 
@@ -61,8 +80,14 @@ pub fn run_repl(ctx: Context) -> Result<()> {
                     continue;
                 }
 
-                if let Err(e) = agent::run_turn(&ctx, line, &mut messages) {
-                    eprintln!("Error: {}", e);
+                let start = Instant::now();
+                match agent::run_turn(&ctx, line, &mut messages) {
+                    Ok(stats) => {
+                        print_stats(start.elapsed(), &stats);
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                    }
                 }
             }
             Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
@@ -447,8 +472,9 @@ fn handle_task_command(ctx: &Context, args: &str) {
     println!("Running subagent '{}'...", agent_name);
 
     // Run the subagent
+    let start = Instant::now();
     match crate::subagent::run_subagent(ctx, &spec, prompt, None) {
-        Ok(result) => {
+        Ok((result, stats)) => {
             if result.ok {
                 println!("\n--- Subagent Output ---");
                 println!("{}", result.output.text);
@@ -461,6 +487,7 @@ fn handle_task_command(ctx: &Context, args: &str) {
             } else if let Some(error) = &result.error {
                 println!("Subagent error: {} - {}", error.code, error.message);
             }
+            print_stats(start.elapsed(), &stats);
         }
         Err(e) => {
             eprintln!("Failed to run subagent: {}", e);

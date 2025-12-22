@@ -12,9 +12,24 @@ pub struct ChatRequest {
     pub tool_choice: Option<String>,
 }
 
+/// Token usage statistics from the API response
+#[derive(Debug, Deserialize, Default, Clone)]
+pub struct Usage {
+    #[serde(default)]
+    pub prompt_tokens: u64,
+    #[serde(default)]
+    pub completion_tokens: u64,
+    /// Total tokens from API (may be redundant with prompt_tokens + completion_tokens)
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub total_tokens: u64,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ChatResponse {
     pub choices: Vec<Choice>,
+    #[serde(default)]
+    pub usage: Option<Usage>,
 }
 
 #[derive(Debug, Deserialize)]
