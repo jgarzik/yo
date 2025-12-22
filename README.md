@@ -2,6 +2,8 @@
 
 An open source, local agentic butler for software development. `yo` orchestrates LLM interactions with file and shell tools, providing a secure policy engine for automated coding tasks.
 
+yo features **multi-vendor, multi-model routing**, sending coding tasks to the best coding model (anthropic opus, for example) and sending planning tasks to the best planning model (qwen, for example), taking a vendor neutral, "best model wins" approach.
+
 ## Features
 
 - **Local execution** - Runs on your machine with access restricted to project files
