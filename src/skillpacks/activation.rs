@@ -10,8 +10,6 @@ pub struct SkillActivation {
     pub name: String,
     pub description: String,
     pub allowed_tools: Option<Vec<String>>,
-    #[allow(dead_code)]
-    pub instructions: String,
 }
 
 /// Manages the set of active skills
@@ -44,7 +42,6 @@ impl ActiveSkills {
             name: pack.name.clone(),
             description: pack.description.clone(),
             allowed_tools: pack.allowed_tools.clone(),
-            instructions: pack.instructions.clone(),
         };
 
         self.active.insert(pack.name.clone(), pack);

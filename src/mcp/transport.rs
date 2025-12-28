@@ -225,9 +225,15 @@ impl SseTransport {
 
         match resp {
             Ok(r) => {
-                // For simple SSE implementations, the response comes back directly
-                let body: Value = r.into_json()?;
-                Ok(body)
+                // Check if response is SSE stream or direct JSON
+                let content_type = r.header("content-type").unwrap_or("").to_lowercase();
+                if content_type.contains("text/event-stream") {
+                    self.parse_sse_response(request_id, r)
+                } else {
+                    // For simple implementations, the response comes back as JSON directly
+                    let body: Value = r.into_json()?;
+                    Ok(body)
+                }
             }
             Err(ureq::Error::Status(code, resp)) => {
                 // Try to get SSE response from the event endpoint
@@ -238,48 +244,64 @@ impl SseTransport {
         }
     }
 
+    /// Parse SSE event stream from a response
+    fn parse_sse_response(&self, request_id: Option<u64>, resp: ureq::Response) -> Result<Value> {
+        let mut reader = BufReader::new(resp.into_reader());
+        let mut line = String::new();
+        let mut data = String::new();
+        let mut events_read = 0;
+        const MAX_EVENTS: usize = 1000; // Prevent infinite loops
+
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break, // EOF
+                Ok(_) => {
+                    let line = line.trim();
+                    if let Some(stripped) = line.strip_prefix("data:") {
+                        data = stripped.trim().to_string();
+                    } else if line.is_empty() && !data.is_empty() {
+                        // End of event, parse the data
+                        events_read += 1;
+                        if events_read > MAX_EVENTS {
+                            return Err(anyhow::anyhow!(
+                                "SSE stream exceeded {} events without matching response",
+                                MAX_EVENTS
+                            ));
+                        }
+                        if let Ok(value) = serde_json::from_str::<Value>(&data) {
+                            // Check if this is the response we're waiting for
+                            if let Some(id) = request_id {
+                                if value.get("id").and_then(|v| v.as_u64()) == Some(id) {
+                                    return Ok(value);
+                                }
+                            } else {
+                                return Ok(value);
+                            }
+                        }
+                        data.clear();
+                    }
+                }
+                Err(e) => return Err(anyhow::anyhow!("SSE read error: {}", e)),
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "SSE stream ended without matching response"
+        ))
+    }
+
     fn try_sse_fallback(
         &self,
         request_id: Option<u64>,
         http_code: u16,
         resp: ureq::Response,
     ) -> Result<Value> {
-        // If the POST returned a redirect or the response is chunked,
-        // try to read it as SSE
+        // If the POST returned an error status, check if it's an SSE stream
         let content_type = resp.header("content-type").unwrap_or("").to_lowercase();
 
         if content_type.contains("text/event-stream") {
-            // Parse SSE events
-            let mut reader = BufReader::new(resp.into_reader());
-            let mut line = String::new();
-            let mut data = String::new();
-
-            loop {
-                line.clear();
-                match reader.read_line(&mut line) {
-                    Ok(0) => break, // EOF
-                    Ok(_) => {
-                        let line = line.trim();
-                        if let Some(stripped) = line.strip_prefix("data:") {
-                            data = stripped.trim().to_string();
-                        } else if line.is_empty() && !data.is_empty() {
-                            // End of event, parse the data
-                            if let Ok(value) = serde_json::from_str::<Value>(&data) {
-                                // Check if this is the response we're waiting for
-                                if let Some(id) = request_id {
-                                    if value.get("id").and_then(|v| v.as_u64()) == Some(id) {
-                                        return Ok(value);
-                                    }
-                                } else {
-                                    return Ok(value);
-                                }
-                            }
-                            data.clear();
-                        }
-                    }
-                    Err(e) => return Err(anyhow::anyhow!("SSE read error: {}", e)),
-                }
-            }
+            return self.parse_sse_response(request_id, resp);
         }
 
         Err(anyhow::anyhow!(

@@ -97,11 +97,16 @@ impl CommandIndex {
         }
     }
 
-    fn load_command(&self, path: &Path, name: &str, source: CommandSource) -> Result<Command> {
+    fn load_command(&mut self, path: &Path, name: &str, source: CommandSource) -> Result<Command> {
         let content = std::fs::read_to_string(path)?;
 
         // Parse optional YAML frontmatter
-        let (meta, content) = parse_frontmatter(&content);
+        let (meta, content, warning) = parse_frontmatter(&content);
+
+        // Record warning but still load the command
+        if let Some(warn) = warning {
+            self.errors.push((path.to_path_buf(), warn));
+        }
 
         Ok(Command {
             name: name.to_string(),
@@ -130,11 +135,12 @@ impl CommandIndex {
 }
 
 /// Parse optional YAML frontmatter from markdown content
-fn parse_frontmatter(content: &str) -> (CommandMeta, String) {
+/// Returns (metadata, body, optional_warning)
+fn parse_frontmatter(content: &str) -> (CommandMeta, String, Option<String>) {
     let trimmed = content.trim_start();
 
     if !trimmed.starts_with("---") {
-        return (CommandMeta::default(), content.to_string());
+        return (CommandMeta::default(), content.to_string(), None);
     }
 
     // Find the closing ---
@@ -143,11 +149,15 @@ fn parse_frontmatter(content: &str) -> (CommandMeta, String) {
         let rest = &trimmed[3 + end_pos + 4..].trim_start();
 
         match serde_yaml::from_str(yaml_content) {
-            Ok(meta) => (meta, rest.to_string()),
-            Err(_) => (CommandMeta::default(), content.to_string()),
+            Ok(meta) => (meta, rest.to_string(), None),
+            Err(e) => (
+                CommandMeta::default(),
+                content.to_string(),
+                Some(format!("invalid YAML frontmatter: {}", e)),
+            ),
         }
     } else {
-        (CommandMeta::default(), content.to_string())
+        (CommandMeta::default(), content.to_string(), None)
     }
 }
 
@@ -158,9 +168,10 @@ mod tests {
     #[test]
     fn test_parse_frontmatter_no_frontmatter() {
         let content = "Just some content";
-        let (meta, body) = parse_frontmatter(content);
+        let (meta, body, warning) = parse_frontmatter(content);
         assert!(meta.description.is_none());
         assert_eq!(body, "Just some content");
+        assert!(warning.is_none());
     }
 
     #[test]
@@ -173,13 +184,14 @@ allowed_tools:
 ---
 
 The actual command content"#;
-        let (meta, body) = parse_frontmatter(content);
+        let (meta, body, warning) = parse_frontmatter(content);
         assert_eq!(meta.description, Some("A test command".to_string()));
         assert_eq!(
             meta.allowed_tools,
             Some(vec!["Read".to_string(), "Grep".to_string()])
         );
         assert_eq!(body, "The actual command content");
+        assert!(warning.is_none());
     }
 
     #[test]

@@ -20,10 +20,6 @@ struct JsonRpcRequest {
 /// JSON-RPC response structure
 #[derive(Deserialize)]
 struct JsonRpcResponse {
-    #[allow(dead_code)]
-    jsonrpc: String,
-    #[allow(dead_code)]
-    id: Option<u64>,
     result: Option<Value>,
     error: Option<JsonRpcError>,
 }
@@ -92,12 +88,14 @@ impl McpClient {
         let result = self.call("initialize", Some(params))?;
 
         // Send initialized notification (no response expected)
-        // For HTTP/SSE this is a fire-and-forget, result is ignored
+        // For HTTP/SSE this is a fire-and-forget, but log errors for debugging
         let notification = json!({
             "jsonrpc": "2.0",
             "method": "notifications/initialized"
         });
-        let _ = self.transport.send(&notification);
+        if let Err(e) = self.transport.send(&notification) {
+            eprintln!("MCP: Failed to send initialized notification: {}", e);
+        }
 
         Ok(result)
     }

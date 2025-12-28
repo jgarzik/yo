@@ -324,6 +324,16 @@ pub fn run_subagent(
         let choice = &response.choices[0];
         let msg = &choice.message;
 
+        // Warn if response was truncated due to length limit
+        if choice.finish_reason.as_deref() == Some("length") {
+            trace(
+                ctx,
+                agent_name,
+                "WARN",
+                "Response truncated (max tokens reached)",
+            );
+        }
+
         // Collect assistant text
         if let Some(content) = &msg.content {
             if !content.is_empty() {

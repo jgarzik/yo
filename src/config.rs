@@ -620,13 +620,25 @@ impl Config {
             }
         }
 
-        // Validate MCP server configs
+        // Validate MCP server configs based on transport type
         for (name, server) in &self.mcp.servers {
-            if server.command.is_empty() {
-                errors.push(ValidationError {
-                    field: format!("mcp.servers.{}.command", name),
-                    message: "Command must not be empty".to_string(),
-                });
+            match server.transport {
+                McpTransport::Stdio => {
+                    if server.command.is_empty() {
+                        errors.push(ValidationError {
+                            field: format!("mcp.servers.{}.command", name),
+                            message: "Command required for stdio transport".to_string(),
+                        });
+                    }
+                }
+                McpTransport::Http | McpTransport::Sse => {
+                    if server.url.is_none() {
+                        errors.push(ValidationError {
+                            field: format!("mcp.servers.{}.url", name),
+                            message: "URL required for http/sse transport".to_string(),
+                        });
+                    }
+                }
             }
         }
 
@@ -716,6 +728,7 @@ mod tests {
         let errors = config.validate().unwrap_err();
         assert_eq!(errors.len(), 1);
         assert!(errors[0].field.contains("auto_compact_threshold"));
+        assert!(errors[0].message.contains("between 0.0 and 1.0"));
     }
 
     #[test]

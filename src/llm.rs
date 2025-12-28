@@ -19,10 +19,6 @@ pub struct Usage {
     pub prompt_tokens: u64,
     #[serde(default)]
     pub completion_tokens: u64,
-    /// Total tokens from API (may be redundant with prompt_tokens + completion_tokens)
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub total_tokens: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,7 +31,6 @@ pub struct ChatResponse {
 #[derive(Debug, Deserialize)]
 pub struct Choice {
     pub message: Message,
-    #[allow(dead_code)]
     pub finish_reason: Option<String>,
 }
 

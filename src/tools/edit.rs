@@ -20,7 +20,7 @@ pub fn schema(opts: &SchemaOptions) -> Value {
                                 "properties": {
                                     "find": { "type": "string" },
                                     "replace": { "type": "string" },
-                                    "count": { "type": "integer" }
+                                    "count": { "type": "integer", "description": "0=all, default 1" }
                                 },
                                 "required": ["find", "replace"]
                             }

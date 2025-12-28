@@ -262,6 +262,13 @@ pub fn run_turn(ctx: &Context, user_input: &str, messages: &mut Vec<Value>) -> R
         let choice = &response.choices[0];
         let msg = &choice.message;
 
+        // Warn if response was truncated due to length limit
+        if choice.finish_reason.as_deref() == Some("length") {
+            eprintln!(
+                "⚠️  Response truncated (max tokens reached). Consider increasing max_tokens or using /compact."
+            );
+        }
+
         if let Some(content) = &msg.content {
             if !content.is_empty() {
                 println!("{}", content);

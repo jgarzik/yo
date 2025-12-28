@@ -40,8 +40,10 @@ pub fn tool_matches(tool: &str, pattern: &str, arg: Option<&str>) -> bool {
             return false;
         }
 
-        // Extract the argument pattern
-        let close_paren = pattern.rfind(')').unwrap_or(pattern.len());
+        // Require matching closing paren for well-formed patterns
+        let Some(close_paren) = pattern.rfind(')') else {
+            return false; // Malformed pattern
+        };
         let arg_pattern = &pattern[open_paren + 1..close_paren];
 
         let Some(actual_arg) = arg else {

@@ -261,7 +261,7 @@ impl PricingTable {
             ModelPricing::new(15.00, 75.00),
         );
 
-        // Venice / free tier models (approximate as free)
+        // Venice.ai models - free tier default, override via [pricing] config if needed
         models.insert(
             "qwen3-235b-a22b-instruct-2507".to_string(),
             ModelPricing::new(0.00, 0.00),
