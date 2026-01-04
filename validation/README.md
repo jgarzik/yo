@@ -62,8 +62,16 @@ This framework validates `yo` functionality by testing **outcomes** rather than 
 | 07-subagents | Task delegation | 3 | ~$0.10 |
 | 08-permissions | Policy enforcement | 2 | ~$0.02 |
 | 09-errors | Error handling | 2 | ~$0.02 |
+| 10-tdd | Test-driven development | 3 | ~$0.10 |
+| 11-debugging | Bug fixing & security review | 3 | ~$0.08 |
+| 12-refactoring | Code modernization | 3 | ~$0.08 |
+| 13-documentation | Doc generation | 3 | ~$0.08 |
+| 14-git | Git operations | 3 | ~$0.08 |
+| 15-multi-file | Cross-file changes | 3 | ~$0.12 |
+| 16-review | Code review | 3 | ~$0.08 |
+| 17-mcp | MCP integration | 2 | ~$0.05 |
 
-**Total estimated cost: ~$0.56 per full run**
+**Total estimated cost: ~$1.20 per full run** (51 tests)
 
 ## Test Priority
 
@@ -105,7 +113,10 @@ report_result
 **common.sh:**
 - `run_yo_oneshot "prompt" [args...]` - Run yo in -p mode
 - `run_yo_repl "cmd1" "cmd2" ...` - Run yo REPL with piped input
+- `run_yo_in_mock_webapp "prompt" [args...]` - Run yo in mock_webapp_scratch
 - `reset_scratch` - Clean fixtures/scratch directory
+- `reset_mock_webapp` - Fresh copy of mock_webapp to scratch
+- `cleanup_mock_webapp` - Remove mock_webapp_scratch
 - `setup_test "name"` - Initialize test
 - `report_result` - Print PASS/FAIL
 
@@ -120,6 +131,13 @@ report_result
 - `assert_file_not_contains "/path" "needle"`
 - `assert_tool_called "ToolName" "$output"`
 - `assert_tools_called "$output" "Tool1" "Tool2" ...`
+- `assert_cargo_test_passes "/path/to/project"`
+- `assert_cargo_test_fails "/path/to/project"`
+- `assert_single_test_passes "/path" "test_name"`
+- `assert_single_test_fails "/path" "test_name"`
+- `assert_git_clean "/path/to/repo"`
+- `assert_git_dirty "/path/to/repo"`
+- `assert_git_has_commits "/path" min_count`
 
 ## Results
 
@@ -137,7 +155,14 @@ Results are saved to `validation/results/YYYY-MM-DD-HHMMSS/`:
 
 ## Fixtures
 
-- `fixtures/hello_repo/` - Simple Rust project for testing
+- `fixtures/hello_repo/` - Simple Rust project for basic tests
+- `fixtures/mock_webapp/` - Full web app with intentional issues for advanced tests:
+  - Security issue: hardcoded API key in `auth.rs`
+  - Deprecated function: `old_query()` in `database.rs`
+  - Validation bug: `@.` passes email validation
+  - Undocumented functions in `handlers.rs`
+  - One intentionally failing test
+- `fixtures/mock_webapp_scratch/` - Ephemeral copy for tests that mutate the webapp
 - `fixtures/scratch/` - Ephemeral directory for test artifacts (reset each test)
 - `fixtures/agents/` - Subagent configurations
 - `fixtures/mcp_calc_server/` - MCP server for integration tests

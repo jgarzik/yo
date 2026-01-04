@@ -31,6 +31,14 @@ CATEGORIES=(
     "07-subagents"
     "08-permissions"
     "09-errors"
+    "10-tdd"
+    "11-debugging"
+    "12-refactoring"
+    "13-documentation"
+    "14-git"
+    "15-multi-file"
+    "16-review"
+    "17-mcp"
 )
 
 # Option to run specific category

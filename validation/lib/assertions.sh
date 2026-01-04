@@ -246,3 +246,144 @@ assert_tools_called() {
     TEST_PASSED=0
     return 1
 }
+
+# Assert cargo test passes in a directory
+# Usage: assert_cargo_test_passes "/path/to/project"
+assert_cargo_test_passes() {
+    local project_dir="$1"
+
+    echo "  Running cargo test in $project_dir" >> "$TEST_LOG"
+    local output
+    output=$(cd "$project_dir" && cargo test 2>&1)
+    local exit_code=$?
+
+    echo "$output" >> "$TEST_LOG"
+
+    if [ $exit_code -ne 0 ]; then
+        echo "  ASSERT FAILED: cargo test failed in $project_dir" | tee -a "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: cargo test passes in $project_dir" >> "$TEST_LOG"
+    return 0
+}
+
+# Assert cargo test fails in a directory
+# Usage: assert_cargo_test_fails "/path/to/project"
+assert_cargo_test_fails() {
+    local project_dir="$1"
+
+    echo "  Running cargo test in $project_dir" >> "$TEST_LOG"
+    local output
+    local exit_code
+    output=$(cd "$project_dir" && cargo test 2>&1) || exit_code=$?
+    exit_code=${exit_code:-0}
+
+    echo "$output" >> "$TEST_LOG"
+
+    if [ $exit_code -eq 0 ]; then
+        echo "  ASSERT FAILED: cargo test should have failed in $project_dir" | tee -a "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: cargo test fails as expected in $project_dir" >> "$TEST_LOG"
+    return 0
+}
+
+# Assert git working tree is clean
+# Usage: assert_git_clean "/path/to/repo"
+assert_git_clean() {
+    local repo_dir="$1"
+
+    local status
+    status=$(cd "$repo_dir" && git status --porcelain 2>&1)
+
+    if [ -n "$status" ]; then
+        echo "  ASSERT FAILED: Git working tree is not clean in $repo_dir" | tee -a "$TEST_LOG"
+        echo "  Dirty files: $status" >> "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: Git working tree is clean in $repo_dir" >> "$TEST_LOG"
+    return 0
+}
+
+# Assert git working tree has changes
+# Usage: assert_git_dirty "/path/to/repo"
+assert_git_dirty() {
+    local repo_dir="$1"
+
+    local status
+    status=$(cd "$repo_dir" && git status --porcelain 2>&1)
+
+    if [ -z "$status" ]; then
+        echo "  ASSERT FAILED: Git working tree should have changes in $repo_dir" | tee -a "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: Git working tree has changes in $repo_dir" >> "$TEST_LOG"
+    return 0
+}
+
+# Assert git has commits beyond initial
+# Usage: assert_git_has_commits "/path/to/repo" min_count
+assert_git_has_commits() {
+    local repo_dir="$1"
+    local min_count="${2:-2}"
+
+    local count
+    count=$(cd "$repo_dir" && git rev-list --count HEAD 2>&1)
+
+    if [ "$count" -lt "$min_count" ]; then
+        echo "  ASSERT FAILED: Expected at least $min_count commits, got $count in $repo_dir" | tee -a "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: Git has $count commits (>= $min_count) in $repo_dir" >> "$TEST_LOG"
+    return 0
+}
+
+# Assert a specific test passes (run just one test)
+# Usage: assert_single_test_passes "/path/to/project" "test_name"
+assert_single_test_passes() {
+    local project_dir="$1"
+    local test_name="$2"
+
+    echo "  Running cargo test $test_name in $project_dir" >> "$TEST_LOG"
+    local output
+    output=$(cd "$project_dir" && cargo test "$test_name" 2>&1)
+    local exit_code=$?
+
+    echo "$output" >> "$TEST_LOG"
+
+    if [ $exit_code -ne 0 ]; then
+        echo "  ASSERT FAILED: Test '$test_name' failed in $project_dir" | tee -a "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: Test '$test_name' passes in $project_dir" >> "$TEST_LOG"
+    return 0
+}
+
+# Assert a specific test fails
+# Usage: assert_single_test_fails "/path/to/project" "test_name"
+assert_single_test_fails() {
+    local project_dir="$1"
+    local test_name="$2"
+
+    echo "  Running cargo test $test_name in $project_dir" >> "$TEST_LOG"
+    local output
+    local exit_code
+    output=$(cd "$project_dir" && cargo test "$test_name" 2>&1) || exit_code=$?
+    exit_code=${exit_code:-0}
+
+    echo "$output" >> "$TEST_LOG"
+
+    if [ $exit_code -eq 0 ]; then
+        echo "  ASSERT FAILED: Test '$test_name' should have failed in $project_dir" | tee -a "$TEST_LOG"
+        TEST_PASSED=0
+        return 1
+    fi
+    echo "  OK: Test '$test_name' fails as expected in $project_dir" >> "$TEST_LOG"
+    return 0
+}

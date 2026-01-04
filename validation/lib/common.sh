@@ -177,6 +177,57 @@ check_api_key() {
     fi
 }
 
+# Mock webapp fixture directory
+MOCK_WEBAPP_DIR="${FIXTURES_DIR}/mock_webapp"
+MOCK_WEBAPP_SCRATCH="${FIXTURES_DIR}/mock_webapp_scratch"
+
+# Reset the mock_webapp scratch directory
+# Creates a fresh git repo copy of mock_webapp for testing
+reset_mock_webapp() {
+    rm -rf "$MOCK_WEBAPP_SCRATCH"
+    cp -r "$MOCK_WEBAPP_DIR" "$MOCK_WEBAPP_SCRATCH"
+
+    # Initialize a git repo in the scratch copy for testing
+    (
+        cd "$MOCK_WEBAPP_SCRATCH" && \
+        git init -q && \
+        git add . && \
+        git commit -q -m "Initial commit" && \
+        git config user.email "test@example.com" && \
+        git config user.name "Test User"
+    ) >> "$TEST_LOG" 2>&1
+
+    echo "Mock webapp scratch reset: $MOCK_WEBAPP_SCRATCH" >> "$TEST_LOG"
+}
+
+# Clean up mock_webapp scratch directory
+cleanup_mock_webapp() {
+    rm -rf "$MOCK_WEBAPP_SCRATCH"
+    echo "Mock webapp scratch cleaned up" >> "$TEST_LOG"
+}
+
+# Run yo in the mock_webapp scratch directory
+# Usage: OUTPUT=$(run_yo_in_mock_webapp "prompt" [additional args...])
+run_yo_in_mock_webapp() {
+    local prompt="$1"
+    shift
+    local args=("$@")
+
+    echo "Command: cd $MOCK_WEBAPP_SCRATCH && $YO_BIN -p \"$prompt\" --yes ${args[*]}" >> "$TEST_LOG"
+
+    local output
+    output=$(cd "$MOCK_WEBAPP_SCRATCH" && "$YO_BIN" -p "$prompt" --yes "${args[@]}" 2>&1)
+    local exit_code=$?
+
+    echo "Exit code: $exit_code" >> "$TEST_LOG"
+    echo "Output:" >> "$TEST_LOG"
+    echo "$output" >> "$TEST_LOG"
+    echo "---" >> "$TEST_LOG"
+
+    echo "$output"
+    return $exit_code
+}
+
 # Wait for user confirmation (for expensive tests)
 confirm_run() {
     local cost="$1"
