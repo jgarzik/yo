@@ -4,6 +4,7 @@ pub mod bash;
 pub mod edit;
 mod glob;
 mod grep;
+mod patch;
 pub mod plan_mode;
 mod read;
 mod search;
@@ -35,6 +36,7 @@ pub fn schemas(opts: &SchemaOptions) -> Vec<Value> {
         read::schema(opts),
         write::schema(opts),
         edit::schema(opts),
+        patch::schema(opts),
         glob::schema(opts),
         search::schema(opts),
         bash::schema(opts),
@@ -47,6 +49,7 @@ pub fn schemas_with_task(opts: &SchemaOptions) -> Vec<Value> {
         read::schema(opts),
         write::schema(opts),
         edit::schema(opts),
+        patch::schema(opts),
         glob::schema(opts),
         search::schema(opts),
         bash::schema(opts),
@@ -66,6 +69,7 @@ pub fn execute(name: &str, args: Value, root: &Path, bash_config: &BashConfig) -
         "Read" => read::execute(args, root),
         "Write" => write::execute(args, root),
         "Edit" => edit::execute(args, root),
+        "Patch" => patch::execute(args, root),
         "Grep" => grep::execute(args, root),
         "Glob" => glob::execute(args, root),
         "Search" => search::execute(args, root),
